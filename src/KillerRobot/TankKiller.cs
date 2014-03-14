@@ -1,123 +1,197 @@
 ﻿using Robocode;
-using System.Drawing;
 using Robocode.Util;
+using System;
+using System.Drawing;
 
 namespace TJY
 {
-    public class TankKiller : Robot
+    public class TankKiller : AdvancedRobot
     {
-        public int Count;
-        public double GunTurnAmount;
-        public string TrackName;
+        #region Member Variables
+
+        private double _direction;
+        private double _deathCount;
+        private Random _randomGenerator;
+
+        #endregion Member Variables
+
+        #region AdvancedRobot Members
+
         public override void Run()
         {
-            BodyColor = (Color.FromArgb(128, 128, 50));
-            GunColor = (Color.FromArgb(50, 50, 20));
-            RadarColor = (Color.FromArgb(200, 200, 70));
-            ScanColor = (Color.White);
-            BulletColor = (Color.Blue);
-
-            IsAdjustGunForRobotTurn = false;
-            Count = 0;
-            GunTurnAmount = 10;
-
-             while (true)
-            {
-                TurnGunRight(GunTurnAmount);
-                Count++;
-                if (Count > 2)
-                {
-                    GunTurnAmount = -10;
-                }
-                if (Count > 5)
-                {
-                    GunTurnAmount = 10;
-                }
-                if (Count > 11)
-                {
-                    TrackName = null;
-                }
-            }
+            BulletColor = (Color.Red);
+            this._randomGenerator = new Random();
+            this._direction = double.PositiveInfinity;
+            SetTurnRadarRightRadians(this._direction);
         }
 
         public override void OnScannedRobot(ScannedRobotEvent evnt)
         {
-            if (TrackName != null && evnt.Name != TrackName)
-            {
-                return;
-            }
+            var index = 30;
+            int matchPosition;
 
-            // If we don't have a target, well, now we do!
-            if (TrackName == null)
-            {
-                TrackName = evnt.Name;
-                Out.WriteLine("Tracking " + TrackName);
-            }
-            // This is our target.  Reset count (see the run method)
-            Count = 0;
-            // If our target is too far away, turn and move toward it.
-            if (evnt.Distance > 150)
-            {
-                GunTurnAmount = Utils.NormalRelativeAngleDegrees(evnt.Bearing + (Heading - RadarHeading));
+            SetAhead(this._direction *= (0.92 - (this._deathCount > 1.25 ? this._randomGenerator.Next() : (Math.Round(_deathCount) - (this.getTime() % 13)))));
 
-                TurnGunRight(GunTurnAmount); // Try changing these to setTurnGunRight,
-                TurnRight(evnt.Bearing); // and see how much Tracker improves...
-                // (you'll have to make Tracker an AdvancedRobot)
-                Ahead(evnt.Distance - 140);
-                return;
-            }
+            var absoluteBearing = evnt.BearingRadians + HeadingRadians;
+            enemyHistory = string.Concat((char)(evnt.Velocity * (Math.Sin(evnt.HeadingRadians - (absoluteBearing)))), enemyHistory);
 
-            // Our target is close.
-            GunTurnAmount = Utils.NormalRelativeAngleDegrees(evnt.Bearing + (Heading - RadarHeading));
-            TurnGunRight(GunTurnAmount);
-            Fire(3);
-
-            // Our target is too close!  Back up.
-            if (evnt.Distance < 100)
+            while (true)
             {
-                if (evnt.Bearing > -90 && evnt.Bearing <= 90)
+                matchPosition = enemyHistory.IndexOf(enemyHistory.Substring(0, index--), 64);
+                if (matchPosition >= 0)
                 {
-                    Back(40);
-                }
-                else
-                {
-                    Ahead(40);
+                    break;
                 }
             }
-            Scan();
+
+            index = (int)evnt.Distance;
+            SetTurnRightRadians(Math.Cos(evnt.BearingRadians) - ((index - 250) * Velocity / 3200));
+
+            do
+            {
+                absoluteBearing += (((short)enemyHistory[--matchPosition]) / evnt.Distance);
+            } while ((index -= 13) > 0);
+
+            SetTurnGunRightRadians(Utils.NormalRelativeAngle(absoluteBearing - GunHeadingRadians));
+            //don't ask... Math is complicated
+            SetFire(2.333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333);
+
+            SetTurnRadarLeftRadians(RadarTurnRemainingRadians);
         }
 
-        /// <summary>
-        ///   onHitRobot:  Set him as our new target
-        /// </summary>
-        public override void OnHitRobot(HitRobotEvent e)
+        public override void OnDeath(DeathEvent evnt)
         {
-            // Only print if he's not already our target.
-            if (TrackName != null && TrackName != e.Name)
-            {
-                Out.WriteLine("Tracking " + e.Name + " due to collision");
-            }
-            // Set the target
-            TrackName = e.Name;
-            // Back up a bit.
-            // Note:  We won't get scan events while we're doing this!
-            // An AdvancedRobot might use setBack(); Execute();
-            GunTurnAmount = Utils.NormalRelativeAngleDegrees(e.Bearing + (Heading - RadarHeading));
-            TurnGunRight(GunTurnAmount);
-            Fire(3);
-            Back(50);
+            this._deathCount += 0.25;
         }
 
-        /// <summary>
-        ///   onWin:  Do a victory dance
-        /// </summary>
-        public override void OnWin(WinEvent e)
+        public override void OnHitWall(HitWallEvent evnt)
         {
-            for (int i = 0; i < 50; i++)
-            {
-                TurnRight(30);
-                TurnLeft(30);
-            }
+            this._direction *= -1.0;
         }
+
+        #endregion AdvancedRobot Members
+
+        #region Private Members
+
+        private double getTime()
+        {
+            return (double)DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
+        }
+
+        private static String enemyHistory =
+            unchecked(
+                ""
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)1
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)2
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)-1
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)0 + (char)0 + (char)0
+                + (char)0 + (char)-2 + (char)-4 + (char)-6
+                + (char)-8 + (char)-8 + (char)-8 + (char)-8
+                + (char)-8 + (char)-8 + (char)-8 + (char)-8
+                + (char)-8 + (char)-8 + (char)-8 + (char)-8
+                + (char)-8 + (char)-8 + (char)-8 + (char)-8
+                + (char)-8 + (char)-8 + (char)-8 + (char)-8
+                + (char)-8 + (char)-8 + (char)-8 + (char)-8
+                + (char)-8 + (char)-8 + (char)-8 + (char)-8
+                + (char)-8 + (char)-8 + (char)-8 + (char)-8
+                + (char)-8 + (char)-8 + (char)-8 + (char)-8
+                + (char)-8 + (char)-8 + (char)-8 + (char)-8
+                + (char)-7 + (char)-6 + (char)-5 + (char)-4
+                + (char)-3 + (char)-2 + (char)-1 + (char)0
+                + (char)2 + (char)4 + (char)6 + (char)8
+                + (char)8 + (char)8 + (char)8 + (char)8
+                + (char)8 + (char)8 + (char)8 + (char)8
+                + (char)8 + (char)8 + (char)8 + (char)8
+                + (char)8 + (char)8 + (char)8 + (char)8
+                + (char)8 + (char)8 + (char)8 + (char)8
+                + (char)8 + (char)8 + (char)8 + (char)8
+                + (char)8 + (char)8 + (char)8 + (char)8
+                + (char)8 + (char)8 + (char)8 + (char)8
+                + (char)8 + (char)8 + (char)8 + (char)8
+                + (char)8 + (char)8 + (char)8 + (char)8
+                + (char)7 + (char)6 + (char)5 + (char)4
+                + (char)3 + (char)2 + (char)1 + (char)0);
+
+        #endregion Private Members
     }
 }
