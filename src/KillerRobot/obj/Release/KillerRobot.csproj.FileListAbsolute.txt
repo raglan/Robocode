@@ -1,0 +1,7 @@
+C:\robocode\KillerRobot\KillerRobot\bin\Release\robocode.dll
+C:\robocode\KillerRobot\KillerRobot\bin\Release\robocode.xml
+C:\robocode\KillerRobot\KillerRobot\bin\Release\TJY.TankKiller_1.dll
+C:\robocode\KillerRobot\KillerRobot\bin\Release\TJY.TankKiller_1.pdb
+C:\robocode\KillerRobot\KillerRobot\obj\Release\TJY.TankKiller_1.dll
+C:\robocode\KillerRobot\KillerRobot\obj\Release\TJY.TankKiller_1.pdb
+C:\robocode\KillerRobot\KillerRobot\obj\Release\KillerRobot.csprojResolveAssemblyReference.cache
