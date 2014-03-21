@@ -1,5 +1,4 @@
-﻿using System.Reflection;
-using Robocode;
+﻿using Robocode;
 using Robocode.Util;
 using System;
 using System.Drawing;
